@@ -11,7 +11,6 @@ export class UserController {
   async createUser(req: Request, res: Response) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { userName, email, password } = req.body;
-
     try {
       const user = await User.create({ userName, email, password });
       return res.status(201).json({
@@ -22,7 +21,7 @@ export class UserController {
       debug(error);
       return res.status(500).json({
         ok: false,
-        msg: "Hable con el administrador para solucionar este problema",
+        msg: "Hable con el administrador para solucionar este problema.",
         error,
       });
     }
