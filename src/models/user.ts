@@ -21,8 +21,14 @@ User.init(
   {
     userName: {
       type: DataTypes.STRING,
-      allowNull: false,
       unique: true,
+      allowNull: false,
+      validate: {
+        notNull: {
+          msg: "Please esadasnter your name111",
+        },
+      },
+      field: "userNaasdasdame",
     },
     email: {
       type: DataTypes.STRING,

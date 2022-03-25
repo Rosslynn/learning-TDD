@@ -69,9 +69,6 @@ export class AppServer {
    */
   private async databaseConnection(): Promise<void> {
     try {
-      await sequelize.sync({
-        alter: process.env.NODE_ENV?.trim() === "development",
-      });
       await sequelize.authenticate();
       debug("Conexión a la base de datos establecida con éxito.");
     } catch (error) {
