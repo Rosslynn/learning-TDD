@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import { validationResult } from "express-validator";
+import Debug from "debug";
+const debug = Debug("app:ValidationErrors");
 
-interface IUserErrors {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [x: string]: any;
+interface IUserSignupErrors {
   userName?: string;
   email?: string;
   password?: string;
@@ -24,11 +24,27 @@ export function validationErrorsMiddleware(
   const result = validationResult(req);
 
   if (!result.isEmpty()) {
-    const validationErrors: IUserErrors = {};
+    const validationErrors: IUserSignupErrors = {};
     for (const [, value] of Object.entries(result.array())) {
-      // eslint-disable-next-line no-prototype-builtins
-      if (validationErrors.hasOwnProperty(value.param)) {
-        validationErrors[value.param] += `. ${value.msg}`;
+      // Se utiliza Object.prototype, etc ya que si se utiliza validationErrors.hasOwnProperty, es posible que el objeto validationErrors
+      // Tenga un método llamado hasOwnProperty, por lo tanto esto puede hacer que el código falle, al utilizar .prototype evitamos esto
+      if (Object.prototype.hasOwnProperty.call(validationErrors, value.param)) {
+        switch (value.param) {
+          case "userName":
+            validationErrors.userName += `. ${value.msg}`;
+            break;
+          case "email":
+            validationErrors.email += `. ${value.msg}`;
+            break;
+          case "password":
+            validationErrors.password += `. ${value.msg}`;
+            break;
+          default:
+            debug(
+              `${value.param} no ha sido definido, parece que su valor ha sido modificado en el proceso`
+            );
+            break;
+        }
         continue;
       }
 
