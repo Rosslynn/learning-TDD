@@ -1,8 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import { validationResult } from "express-validator";
-import Debug from "debug";
-const debug = Debug("app:ValidationErrors");
-
+/*import Debug from "debug";
+ const debug = Debug("app:ValidationErrors");
+ */
 interface IUserSignupErrors {
   userName?: string;
   email?: string;
@@ -26,6 +26,7 @@ export function validationErrorsMiddleware(
   if (!result.isEmpty()) {
     const validationErrors: IUserSignupErrors = {};
     for (const [, value] of Object.entries(result.array())) {
+      /*  // TODO: Esto es innecesario si se utiza .bail()
       // Se utiliza Object.prototype, etc ya que si se utiliza validationErrors.hasOwnProperty, es posible que el objeto validationErrors
       // Tenga un método llamado hasOwnProperty, por lo tanto esto puede hacer que el código falle, al utilizar .prototype evitamos esto
       if (Object.prototype.hasOwnProperty.call(validationErrors, value.param)) {
@@ -46,7 +47,7 @@ export function validationErrorsMiddleware(
             break;
         }
         continue;
-      }
+      } */
 
       Object.defineProperty(validationErrors, value.param, {
         value: `${value.msg}`,

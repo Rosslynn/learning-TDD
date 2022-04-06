@@ -1,8 +1,15 @@
 import request from "supertest";
-import { sequelize } from "../src/database/connection";
+import { sequelize } from "../src/config/connection";
+import { interactsWithMail as iwm } from "nodemailer-stub";
 
 import { AppServer } from "../src/models/server";
 import { User } from "../src/models/user";
+
+interface IUserData {
+  userName: string | null;
+  email: string | null;
+  password: string | null;
+}
 
 // Probar la aplicación, para esto se utiliza supertest
 const appServer = new AppServer();
@@ -217,5 +224,188 @@ describe("User Registration", () => {
       "email",
       "password",
     ]);
+  });
+
+  it.each([
+    ["userName", "Los nombres son obligatorios"],
+    ["email", "El correo es obligatorio"],
+    ["password", "La contraseña es requerida"],
+  ])("when %s is null should return %s", async (field, messageReceived) => {
+    // Arrange
+    const userData: IUserData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    switch (field) {
+      case "userName":
+        userData.userName = null;
+        break;
+      case "email":
+        userData.email = null;
+        break;
+      case "password":
+        userData.password = null;
+        break;
+      default:
+        console.log(`${field} no existe.`);
+        break;
+    }
+
+    // Act
+    const response = await postValidUser(userData);
+
+    // Assert
+    expect(
+      response.body.validationErrors[field].includes(messageReceived)
+    ).toBe(true);
+  });
+
+  it.each`
+    field         | value                | messageReceived
+    ${"userName"} | ${null}              | ${"Los nombres son obligatorios"}
+    ${"userName"} | ${"12"}              | ${"El mínimo de caracteres para el nombre es 3 y el máximo 32"}
+    ${"userName"} | ${"12".repeat(34)}   | ${"El mínimo de caracteres para el nombre es 3 y el máximo 32"}
+    ${"email"}    | ${null}              | ${"El correo es obligatorio"}
+    ${"email"}    | ${"askdas"}          | ${"Debe tener formato de correo: micorreo@hermoso.com"}
+    ${"email"}    | ${"askdas@aaaaaaaa"} | ${"Debe tener formato de correo: micorreo@hermoso.com"}
+    ${"password"} | ${null}              | ${"La contraseña es requerida"}
+    ${"password"} | ${"4"}               | ${"El número mínimo de caracteres es 6"}
+  `(
+    "BEST WAY | when $field is $value should return $messageReceived",
+    async ({ field, value, messageReceived }) => {
+      // Arrange
+      const userData: IUserData = {
+        userName: "Lynross",
+        email: "mauriciobarva@gmail.com",
+        password: "123456",
+      };
+
+      switch (field) {
+        case "userName":
+          userData.userName = value;
+          break;
+        case "email":
+          userData.email = value;
+          break;
+        case "password":
+          userData.password = value;
+          break;
+        default:
+          console.log(`${field} no existe.`);
+          break;
+      }
+
+      // Act
+      const response = await postValidUser(userData);
+
+      // Assert
+      expect(response.body.validationErrors[field]).toBe(messageReceived);
+    }
+  );
+
+  it("returns userName already in use when userName is already in use", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    await User.create({ ...userData });
+    const response = await postValidUser(userData);
+
+    expect(response.body.validationErrors.userName).toBe(
+      "userName already in use"
+    );
+  });
+
+  it("returns E-mail is already in use when same email is already in use", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    await User.create({ ...userData, userName: "XD" });
+    const response = await postValidUser({ ...userData, userName: "jasja" });
+
+    expect(response.body.validationErrors.email).toBe(
+      "E-mail is already in use"
+    );
+  });
+
+  it("returns error of both, userName and Email when they are already in use", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    await User.create({ ...userData });
+    const response = await postValidUser(userData);
+
+    // To equal se debe usar comparando objetos o arrays
+    expect(Object.keys(response.body.validationErrors)).toEqual([
+      "userName",
+      "email",
+    ]);
+  });
+
+  it("creates user in inactive mode", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    await postValidUser(userData);
+    const dbUser = await User.findOne({
+      where: { email: userData.email },
+    });
+
+    if (dbUser) {
+      expect(dbUser.isActive).toBe(false);
+    }
+  });
+
+  it("creates an activation token for user", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    await postValidUser(userData);
+    const dbUser = await User.findOne({
+      where: { email: userData.email },
+    });
+
+    if (dbUser) {
+      expect(dbUser.activationToken).toBeTruthy();
+    }
+  });
+
+  it("sends an account activation email with activation token", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    await postValidUser(userData);
+    const dbUser = await User.findOne({
+      where: { email: userData.email },
+    });
+    const lastMail = iwm.lastMail();
+    console.log({ lastMail });
+    expect(lastMail.to[0]).toContain(userData.email);
+    expect(lastMail.content).toContain(dbUser?.activationToken);
   });
 });

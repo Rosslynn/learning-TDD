@@ -1,19 +1,37 @@
 import { Request, Response } from "express";
 import Debug from "debug";
-const debug = Debug("app:userController");
+import crypto from "crypto";
 
 import { User } from "../models/user";
+import { sendAccountActivationToken } from "../email/emailService";
+
+const debug = Debug("app:userController");
+
+function activationAccountToken(length: number) {
+  return crypto.randomBytes(length).toString("hex").substring(0, length);
+}
 
 export class UserController {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  constructor() {}
-
   async createUser(req: Request, res: Response) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { userName, email, password } = req.body;
 
     try {
-      const user = await User.create({ userName, email, password });
+      const user = await User.create(
+        {
+          userName,
+          email,
+          password,
+          activationToken: activationAccountToken(16),
+        },
+        { fields: ["userName", "email", "password", "activationToken"] }
+      );
+
+      await sendAccountActivationToken(
+        undefined,
+        email,
+        undefined,
+        user.activationToken
+      );
 
       return res.status(201).json({
         ok: true,

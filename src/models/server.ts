@@ -1,5 +1,5 @@
 import express, { Application } from "express";
-import { sequelize } from "../database/connection";
+import { sequelize } from "../config/connection";
 import cors from "cors";
 import Debug from "debug";
 const debug = Debug("app:server");
