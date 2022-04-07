@@ -4,6 +4,7 @@ import { interactsWithMail as iwm } from "nodemailer-stub";
 
 import { AppServer } from "../src/models/server";
 import { User } from "../src/models/user";
+import * as emailService from "../src/email/emailService";
 
 interface IUserData {
   userName: string | null;
@@ -391,6 +392,27 @@ describe("User Registration", () => {
     }
   });
 
+  it("returns 500 error when sending email fails", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    // Act
+    // Si se utiliza un mock hay que finalizarlo porque sino la función se sigue ejecutando con el valor especificado
+    const mockSendAccountActivation = jest
+      .spyOn(emailService, "sendAccountActivationToken")
+      .mockRejectedValue({ message: "XDDDDDDDDDDDDDD" });
+    const response = await postValidUser(userData);
+    console.log(response.text);
+
+    // Assert
+    expect(response.statusCode).toBe(500);
+    mockSendAccountActivation.mockRestore();
+  });
+
   it("sends an account activation email with activation token", async () => {
     // Arrange
     const userData = {
@@ -399,13 +421,60 @@ describe("User Registration", () => {
       password: "123456",
     };
 
+    // Act
     await postValidUser(userData);
     const dbUser = await User.findOne({
       where: { email: userData.email },
     });
     const lastMail = iwm.lastMail();
-    console.log({ lastMail });
+
+    // Assert
     expect(lastMail.to[0]).toContain(userData.email);
     expect(lastMail.content).toContain(dbUser?.activationToken);
+  });
+
+  it("returns ok:false and message: Hable con el administrador para solucionar este problema. when sending mail fails", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    // Act
+    // Si se utiliza un mock hay que finalizarlo porque sino la función se sigue ejecutando con el valor especificado
+    const mockSendAccountActivation = jest
+      .spyOn(emailService, "sendAccountActivationToken")
+      .mockRejectedValue({});
+    const response = await postValidUser(userData);
+    console.log(response.body);
+    mockSendAccountActivation.mockRestore();
+    // Assert
+    expect(response.body.ok).toBe(false);
+    expect(response.body.msg).toBe(
+      "Hable con el administrador para solucionar este problema."
+    );
+  });
+
+  it("returns null, do not save the user in the database when email sending fails", async () => {
+    // Arrange
+    const userData = {
+      userName: "Lynross",
+      email: "mauriciobarva@gmail.com",
+      password: "123456",
+    };
+
+    // Act
+    // Si se utiliza un mock hay que finalizarlo porque sino la función se sigue ejecutando con las características especificadas
+    const mockSendAccountActivation = jest
+      .spyOn(emailService, "sendAccountActivationToken")
+      .mockRejectedValue({});
+    await postValidUser(userData);
+    mockSendAccountActivation.mockRestore();
+    const dbUser = await User.findOne({
+      where: { email: userData.email },
+    });
+    // Assert
+    expect(dbUser).toBeNull();
   });
 });

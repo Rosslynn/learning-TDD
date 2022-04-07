@@ -4,6 +4,7 @@ import crypto from "crypto";
 
 import { User } from "../models/user";
 import { sendAccountActivationToken } from "../email/emailService";
+import { sequelize } from "../config/connection";
 
 const debug = Debug("app:userController");
 
@@ -14,7 +15,7 @@ function activationAccountToken(length: number) {
 export class UserController {
   async createUser(req: Request, res: Response) {
     const { userName, email, password } = req.body;
-
+    const transaction = await sequelize.transaction();
     try {
       const user = await User.create(
         {
@@ -23,7 +24,10 @@ export class UserController {
           password,
           activationToken: activationAccountToken(16),
         },
-        { fields: ["userName", "email", "password", "activationToken"] }
+        {
+          transaction,
+          fields: ["userName", "email", "password", "activationToken"],
+        }
       );
 
       await sendAccountActivationToken(
@@ -33,6 +37,9 @@ export class UserController {
         user.activationToken
       );
 
+      // Guarda los datos en la bd
+      await transaction.commit();
+
       return res.status(201).json({
         ok: true,
         user,
@@ -40,6 +47,7 @@ export class UserController {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       debug(error);
+      transaction.rollback();
       return res.status(500).json({
         ok: false,
         msg: "Hable con el administrador para solucionar este problema.",
